@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Prédiction Aviator - Signal Unique</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+    <style>
+        html, body {
+            margin: 0; padding: 0; width: 100vw; min-height: 100vh; background: radial-gradient(ellipse at 50% 20%, #191932 60%, #101019 100%);
+            color: #f4f4f4; font-family: 'Segoe UI', Arial, sans-serif; overflow-x: hidden;
+        }
+        body {
+            max-width: 100vw; 
+        }
+        .main-content {
+            min-height: 100vh; width: 100vw;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            padding-top: 10px; box-sizing: border-box;
+        }
+        .header {
+            width: 100vw;
+            display: none !important; /* CACHE LA BARRE DU HAUT TOTALEMENT SUR MOBILE */
+        }
+        /* PREDICTION BOX */
+        .prediction-box {
+            background: linear-gradient(135deg, #191932 60%, #1a1221 100%);
+            border-radius: 24px;
+            box-shadow: 0 4px 24px #ff4c7138, 0 2px 24px #19193255;
+            padding: 30px 8vw 90px 8vw;
+            margin-top: 32px;
+            display: flex; flex-direction: column; align-items: center;
+            min-width: 0; width: 96vw; max-width: 460px;
+            border: 1.5px solid #332040;
+            position: relative;
+        }
+        .predict-title {
+            color: #fff; font-size: 1.3em; font-weight: bold; margin-bottom: 10px;
+            letter-spacing: 0.03em; text-shadow: 0 2px 12px #ff4c7140;
+        }
+        /* CERCLE ANIMATION */
+        .big-loader-container {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            position: relative;
+            width: 260px; height: 260px; margin: 0 auto 26px auto;
+            touch-action: none;
+        }
+        .big-circle-loader {
+            border: 13px solid #232029;
+            border-top: 13px solid #ff4c71;
+            border-right: 13px solid #ffb4c7;
+            border-bottom: 13px solid #ff4c71bb;
+            border-left: 13px solid #291a26;
+            border-radius: 50%;
+            width: 205px; height: 205px;
+            animation: bigspin-fast 0.38s linear infinite;
+            position: absolute; top: 0; left: 0; z-index: 1;
+            box-shadow: 0 8px 28px #ff4c7133, 0 0 0 10px #ff4c7112 inset, 0 0 40px 7px #ff2b4970;
+        }
+        @keyframes bigspin-fast { 100% { transform: rotate(360deg);} }
+        .cote-center {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%,-50%);
+            color: #fff;
+            font-size: 2.7em;
+            font-weight: bold;
+            z-index: 2;
+            background: linear-gradient(135deg,#21101d 80%,#ffb4c712 100%);
+            border-radius: 1em;
+            padding: 0.37em 1.1em;
+            box-shadow: 0 2px 28px #ff4c7140;
+            letter-spacing: 0.04em;
+            text-align: center;
+            border: 2.3px solid #ff4c71;
+            text-shadow: 0 2px 6px #ffb4c751, 0 0 2px #ff4c7130;
+            display: none;
+            min-width: 100px;
+        }
+        .big-loader-container.show-cote .cote-center {
+            display: block;
+            animation: popCote 0.32s cubic-bezier(.44,1.6,.67,1) 1;
+        }
+        @keyframes popCote {
+            0% { transform: translate(-50%,-50%) scale(0.8);}
+            60% { transform: translate(-50%,-50%) scale(1.12);}
+            100% { transform: translate(-50%,-50%) scale(1);}
+        }
+
+        #analysis-logs {
+            position: absolute;
+            left: 50%;
+            top: 100%;
+            transform: translate(-50%, 18px);
+            width: 100%;
+            text-align: center;
+            font-size: 0.92em;
+            color: #ffb4c7;
+            white-space: nowrap;
+            overflow: hidden;
+            height: 1.4em;
+            line-height: 1.4em;
+            pointer-events: none;
+            user-select: none;
+            z-index: 3;
+            font-family: 'Fira Mono', 'Consolas', 'monospace', monospace;
+            letter-spacing: 0.01em;
+            opacity: 0.85;
+            transition: all 0.1s;
+            text-shadow: 0 1px 4px #21101d, 0 0 2px #ffb4c721;
+        }
+        .predicted-cote {
+            font-size: 2em; font-weight: bold; color: #ff4c71; margin-top: 36px; text-align: center;
+            background: linear-gradient(90deg, #2d1a26 60%, #20151c 100%);
+            border-radius: 14px; padding: 16px 14px;
+            box-shadow: 0 2px 14px #ff4c7133;
+            border: 1.2px solid #ff4c7130;
+            width: 90vw; max-width: 340px;
+        }
+        .predicted-hour {
+            font-size: 1.08em; color: #ffb4c7; margin-top: 10px; font-weight: bold; text-shadow: 0 1px 6px #21101d;
+        }
+        .error-message {
+            color: #e74c3c; font-size: 1.1em; text-align: center; margin-top: 20px;
+        }
+        .info-message {
+            color: #ff4c71; font-size: 1em; text-align: center; margin-top: 18px;
+        }
+        .signal-btn {
+            position: fixed;
+            left: 0; bottom: 0;
+            width: 100vw; max-width: 100vw;
+            padding: 20px 0;
+            background: linear-gradient(90deg, #ff4c71 60%, #ffb4c7 100%);
+            color: #fff; font-size: 1.25em; border: none; border-radius: 0;
+            font-weight: bold; letter-spacing: 1px; cursor: pointer; margin: 0;
+            transition: background 0.20s, color 0.20s, box-shadow 0.25s;
+            box-shadow: 0 -2px 22px #ff4c7130, 0 0 8px #ff4c7140;
+            z-index: 9999;
+            text-align: center;
+            border-top-left-radius: 22px;
+            border-top-right-radius: 22px;
+        }
+        .signal-btn:disabled, .signal-btn.disabled {
+            background: #2d1a26;
+            color: #eee;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        /* Responsive - Mobile Only! */
+        @media (max-width: 900px) {
+            html, body, .main-content, .prediction-box { max-width: 100vw; }
+            .prediction-box { min-width: 0; width: 99vw; border-radius: 18px; }
+            .big-loader-container { width: 96vw; max-width: 320px; height: 180px; }
+            .big-circle-loader { width: 130px; height: 130px; border-width: 8px; }
+            .cote-center { font-size: 1.45em; min-width: 72px; }
+            #analysis-logs { font-size: 0.81em; }
+            .predicted-cote { font-size: 1.15em; width: 97vw; min-width: 0; padding: 9px 6px; }
+            .signal-btn { font-size: 1.1em; padding: 14px 0;}
+        }
+        /* Desktop - Bloque tout */
+        @media (min-width: 900px) {
+            body, html, .main-content, .prediction-box, .big-loader-container, .signal-btn {
+                display: none !important;
+            }
+            body::before {
+                content: 'Disponible uniquement sur mobile 📱';
+                color: #ff4c71; background: #181828;
+                display: block; text-align: center; font-size: 2.1em; padding: 15vh 12vw; width: 100vw; min-height: 100vh;
+            }
+        }
+        /* Popups */
+        .popup-bg {
+            display: none; position: fixed; z-index: 100000; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.32); align-items: center; justify-content: center;
+        }
+        .popup {
+            background: #1a1221; padding: 30px 26px 22px 26px; border-radius: 18px; color: #fff;
+            box-shadow: 0 8px 32px #ff4c7166; text-align: center; min-width: 250px; max-width: 90vw;
+            border: 2px solid #ff4c71; animation: fadeIn 0.3s;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(26px);} to { opacity: 1; transform: translateY(0);} }
+        .popup .fa-wifi-slash { color: #ff4c71; font-size: 2em; margin-bottom: 9px;}
+        .popup-title { font-size: 1.13em; margin-bottom: 7px; font-weight: bold;}
+        .popup .close-btn {
+            margin-top: 16px; border: none; background: #ff4c71; color: #fff; padding: 8px 24px; border-radius: 14px;
+            font-size: 1.01em; font-weight: 600; letter-spacing: .5px; cursor: pointer; transition: background 0.18s;
+        }
+        .popup .close-btn:hover { background: #ff2222; }
+        .popup input[type="text"] {
+            padding: 9px 12px; border-radius: 10px; border: 1.5px solid #ff4c71; font-size: 1em; margin-top: 12px; margin-bottom: 10px; width: 75%;
+            background: #2d1a26; color: #fff; outline: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Connexion perdue popup -->
+    <div class="popup-bg" id="lost-connection-popup">
+        <div class="popup">
+            <i class="fa fa-wifi-slash"></i>
+            <div class="popup-title">Connexion perdue</div>
+            <div class="popup-text">
+                Vous avez perdu votre connexion internet.<br>
+                Veuillez vérifier votre réseau pour continuer à utiliser la prédiction.
+            </div>
+            <button class="close-btn" onclick="closePopup()">OK</button>
+        </div>
+    </div>
+    <!-- Popup ID joueur -->
+    <div class="popup-bg" id="id-popup">
+        <div class="popup">
+            <div class="popup-title">Entrez votre ID joueur Aviator :</div>
+            <input type="text" id="id-input" maxlength="32" placeholder="ID joueur..." autocomplete="off"/>
+            <div id="id-error" style="color:#ff4c71;font-size:0.99em;"></div>
+            <button class="close-btn" onclick="validateId()">Valider</button>
+        </div>
+    </div>
+    <!-- Popup synchronisation -->
+    <div class="popup-bg" id="sync-popup">
+        <div class="popup">
+            <div class="popup-title"><i class="fa fa-sync fa-spin"></i> Synchronisation...</div>
+            <div style="font-size:1em; color:#ff4c71;">Veuillez patienter...</div>
+        </div>
+    </div>
+    <div class="main-content" id="main-content" style="display:none;">
+        <!-- .header supprimé sur mobile -->
+        <div class="prediction-box">
+            <div class="predict-title">Signal Aviator</div>
+            <div class="big-loader-container" id="big-loader-container" style="display:none;">
+                <div class="big-circle-loader"></div>
+                <div class="cote-center" id="cote-center"></div>
+                <div id="analysis-logs"></div>
+            </div>
+            <div class="predicted-cote" id="predicted-cote" style="display:none;"></div>
+            <div class="predicted-hour" id="predicted-hour" style="display:none;"></div>
+            <div class="error-message" id="error-message"></div>
+            <div class="info-message" id="info-message"></div>
+        </div>
+        <button class="signal-btn" id="signal-btn" onclick="startPrediction()">Rechercher le signal</button>
+    </div>
+    <script>
+        // --------- Gestion Connexion
+        let interrupted = false;
+        function setConnection(status) {
+            // (header caché sur mobile, inutile ici)
+        }
+        function checkConnection() {
+            if (!navigator.onLine) {
+                interrupted = true;
+                stopBigLoader();
+                document.getElementById('lost-connection-popup').style.display = "flex";
+            }
+        }
+        window.addEventListener('online', () => {});
+        window.addEventListener('offline', () => {
+            interrupted = true;
+            stopBigLoader();
+            document.getElementById('lost-connection-popup').style.display = "flex";
+        });
+        function closePopup() {
+            document.getElementById('lost-connection-popup').style.display = "none";
+        }
+        setInterval(checkConnection, 2000);
+
+        // --------- Gestion ID joueur (mémoire + vérif backend)
+        function getUserId() {
+            return localStorage.getItem('aviator_userid');
+        }
+        function setUserId(id) {
+            localStorage.setItem('aviator_userid', id);
+        }
+        function clearUserId() {
+            localStorage.removeItem('aviator_userid');
+        }
+        function updateDisplayId() {}
+
+        // ---------- POPUP ID à l'arrivée (une seule fois)
+        async function showIdPopup(force = false) {
+            document.getElementById('id-input').value = '';
+            document.getElementById('id-error').textContent = '';
+            document.getElementById('id-popup').style.display = "flex";
+            document.getElementById('signal-btn').disabled = true;
+        }
+        async function validateId() {
+            const id = document.getElementById('id-input').value.trim();
+            if (!/^\d{6,15}$/.test(id)) {
+                document.getElementById('id-error').textContent = "ID invalide. Entrez un numéro d’ID (chiffres, min 6).";
+                return;
+            }
+            document.getElementById('id-popup').style.display = "none";
+            document.getElementById('sync-popup').style.display = "flex";
+            try {
+                const resp = await fetch('data/allowed_ids.txt?_=' + Date.now());
+                if (!resp.ok) throw new Error("Impossible de vérifier l’ID.");
+                const content = await resp.text();
+                const allowedIds = content.split('\n').map(l=>l.trim()).filter(l=>l!=="");
+                if (!allowedIds.includes(id)) {
+                    document.getElementById('sync-popup').style.display = "none";
+                    document.getElementById('id-error').textContent = "Cet ID n’existe pas dans la base.";
+                    document.getElementById('id-popup').style.display = "flex";
+                    return;
+                }
+                setUserId(id);
+                document.getElementById('sync-popup').style.display = "none";
+                document.getElementById('main-content').style.display = "flex";
+                document.getElementById('signal-btn').disabled = false;
+            } catch (e) {
+                document.getElementById('sync-popup').style.display = "none";
+                document.getElementById('id-error').textContent = "Erreur serveur: " + e.message;
+                document.getElementById('id-popup').style.display = "flex";
+            }
+        }
+
+        // ---------- Déconnexion (inutile, header caché)
+        function logout() {
+            clearUserId();
+            window.location.href = "index.html";
+        }
+
+        // ----------- ALGORITHME DE CALCUL AVANCÉ (50 dernières valeurs) -----------
+        function removeOutliers(data, factor = 2) {
+            const values = data.map(x => x.value);
+            const avg = values.reduce((a,b)=>a+b,0)/values.length;
+            const std = Math.sqrt(values.reduce((s,v)=>s+Math.pow(v-avg,2),0)/values.length);
+            return data.filter(x => Math.abs(x.value - avg) < factor * std);
+        }
+        function ema(values, alpha = 0.3) {
+            let result = values[0];
+            for (let i = 1; i < values.length; i++) {
+                result = alpha * values[i] + (1 - alpha) * result;
+            }
+            return result;
+        }
+        function tendance(history, n = 8) {
+            const recent = history.slice(-n);
+            if (recent.length < 2) return 0;
+            let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+            for (let i = 0; i < recent.length; i++) {
+                sumX += i; sumY += recent[i].value;
+                sumXY += i * recent[i].value; sumXX += i * i;
+            }
+            const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+            return slope;
+        }
+        function moyennePonderee(history) {
+            if (!history.length) return null;
+            const recent = history.slice(-12);
+            const allAvg = history.reduce((s,v) => s+v.value, 0) / history.length;
+            const recAvg = recent.length ? recent.reduce((s,v) => s+v.value,0)/recent.length : allAvg;
+            const sorted = history.map(v => v.value).sort((a, b) => a - b);
+            const median = sorted.length % 2 === 0 ?
+                (sorted[sorted.length/2-1] + sorted[sorted.length/2]) / 2
+                : sorted[Math.floor(sorted.length/2)];
+            const ecartType = Math.sqrt(history.reduce((acc, v) => acc + Math.pow(v.value - allAvg, 2), 0) / history.length);
+            let poidsRecent = ecartType > 0.25 ? 0.40 : 0.65;
+            let poidsGlobal = 0.25;
+            let poidsMedian = ecartType > 0.25 ? 0.35 : 0.10;
+            return recAvg * poidsRecent + allAvg * poidsGlobal + median * poidsMedian;
+        }
+        async function fetchLastPredictions(N = 50) {
+            try {
+                const resp = await fetch('data/prediction_data.txt?_=' + Date.now());
+                if (!resp.ok) throw new Error("Impossible de charger les données.");
+                const lines = (await resp.text()).split('\n').filter(l=>l.trim()!=="");
+                const lastLines = lines.slice(-N);
+                const data = lastLines.map(row => {
+                    const [timestamp, value] = row.split('|').map(item => item.trim());
+                    return { timestamp, value: parseFloat(value) };
+                });
+                return removeOutliers(data);
+            } catch {
+                return [];
+            }
+        }
+
+        // ----------- Animation cercle central -----------
+        function showBigLoader() {
+            const loader = document.getElementById('big-loader-container');
+            loader.classList.remove('show-cote');
+            document.getElementById('cote-center').style.display = "none";
+            document.getElementById('cote-center').textContent = '';
+            loader.style.display = "flex";
+            document.getElementById('analysis-logs').textContent = "";
+        }
+        function showPredictedCoteInCircle(cote) {
+            const loader = document.getElementById('big-loader-container');
+            document.getElementById('cote-center').textContent = cote;
+            document.getElementById('cote-center').style.display = "block";
+            loader.classList.add('show-cote');
+        }
+        function stopBigLoader() {
+            document.getElementById('big-loader-container').style.display = "none";
+            document.getElementById('cote-center').textContent = '';
+            document.getElementById('cote-center').style.display = "none";
+            document.getElementById('big-loader-container').classList.remove('show-cote');
+            document.getElementById('analysis-logs').textContent = "";
+        }
+
+        // ----------- Séquence de faux logs d'analyse très rapide et réaliste -----------
+        function getFutureMinutes() {
+            // 98% : 1.5 à 2 min ; 2% : 2 à 4 min
+            const r = Math.random();
+            if (r < 0.98) return 1.5 + Math.random() * 0.5; // 1.5 à 2
+            return 2 + Math.random() * 2; // 2 à 4
+        }
+        function getAnalysisSequence() {
+            // Faux logs style IA
+            return [
+                "→ IA: handshake...",
+                "→ Authentification...",
+                "→ Data stream...",
+                "→ Extraction ⏳",
+                "→ Prétraitement...",
+                "→ Tendance: scan...",
+                "→ Régression...",
+                "→ Fusion modèles...",
+                "→ Prédiction...",
+                "→ Génération signal...",
+                "→ Finalisation...",
+                "→ Signal OK."
+            ];
+        }
+        async function showAnalysisLogs() {
+            const logs = getAnalysisSequence();
+            const logElem = document.getElementById('analysis-logs');
+            for (let i = 0; i < logs.length; i++) {
+                logElem.textContent = logs[i];
+                await new Promise(res => setTimeout(res, 55 + Math.random() * 24)); // Très rapide & illisible
+            }
+            logElem.textContent = "";
+        }
+
+        // ----------- Lancement de la prédiction avancée -----------
+        async function startPrediction() {
+            if (!getUserId()) {
+                showIdPopup();
+                return;
+            }
+            document.getElementById('predicted-cote').style.display = "none";
+            document.getElementById('predicted-hour').style.display = "none";
+            document.getElementById('error-message').textContent = '';
+            document.getElementById('info-message').textContent = '';
+            document.getElementById('signal-btn').disabled = true;
+            interrupted = false;
+
+            showBigLoader();
+            document.getElementById('analysis-logs').textContent = "";
+
+            // Animation logs
+            const logsPromise = showAnalysisLogs();
+
+            // Heure cible mobile (toujours seconds arrondis)
+            const now = new Date();
+            const minutesToAdd = getFutureMinutes();
+            const predictionTime = new Date(now.getTime() + minutesToAdd*60000);
+
+            // Récupération et calcul
+            const history = await fetchLastPredictions(50);
+            let cote = null;
+            if (!history.length) {
+                stopBigLoader();
+                document.getElementById('error-message').textContent = "Erreur : Impossible de charger les données.";
+                document.getElementById('signal-btn').disabled = false;
+                return;
+            }
+            let predValue = moyennePonderee(history);
+            let emaValue = ema(history.map(v => v.value));
+            predValue = (predValue + emaValue) / 2;
+            const allAvg = history.reduce((s,v) => s+v.value, 0) / history.length;
+            const ecartType = Math.sqrt(history.reduce((acc, v) => acc + Math.pow(v.value - allAvg, 2), 0) / history.length);
+            let bruit = (Math.random() + Math.random() + Math.random() - 1.5) * ecartType * 0.28;
+            predValue += bruit;
+            let trend = tendance(history, 8);
+            predValue += trend * 2;
+            predValue *= 1 + (minutesToAdd-1.5)*0.03 + (Math.random()-0.5)*0.02;
+            if (predValue < 1.01) predValue = 1.01;
+            cote = predValue.toFixed(2);
+
+            await Promise.all([
+                logsPromise,
+                new Promise(res => setTimeout(res, 550+Math.random()*150))
+            ]);
+            if (interrupted) { stopBigLoader(); document.getElementById('signal-btn').disabled = false; return; }
+
+            // Affiche la cote dans le cercle (au centre) puis retire le loader
+            showPredictedCoteInCircle(cote);
+            await new Promise(res => setTimeout(res, 1000));
+            if (interrupted) { stopBigLoader(); document.getElementById('signal-btn').disabled = false; return; }
+            stopBigLoader();
+
+            // Affiche la prédiction
+            document.getElementById('predicted-cote').style.display = "block";
+            document.getElementById('predicted-cote').textContent = "Cote prévue : " + cote;
+            document.getElementById('predicted-hour').style.display = "block";
+            document.getElementById('predicted-hour').textContent = "Signal prévu pour : " +
+                predictionTime.getHours().toString().padStart(2,'0') + ":" +
+                predictionTime.getMinutes().toString().padStart(2,'0') + ":" +
+                predictionTime.getSeconds().toString().padStart(2,'0');
+            document.getElementById('info-message').textContent = "";
+            document.getElementById('signal-btn').disabled = false;
+        }
+
+        // ----------- INIT
+        document.addEventListener('DOMContentLoaded', async () => {
+            let id = getUserId();
+            if (!id) {
+                document.getElementById('main-content').style.display = "none";
+                await new Promise(res=>setTimeout(res, 350));
+                showIdPopup();
+            } else {
+                document.getElementById('main-content').style.display = "flex";
+                document.getElementById('signal-btn').disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
